@@ -1,8 +1,9 @@
 [project]
 name = "docker-util"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Per-directory Docker workflow: build an image, then create, enter, and clean up the containers built from it."
 readme = "README.md"
+license = "MIT"
 authors = [
     { name = "Justin Garrigus", email = "justin.m.garrigus@gmail.com" }
 ]
@@ -15,3 +16,45 @@ docker-util = "docker_util:main"
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "ruff>=0.15.20",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 80
+indent-width = 4
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # import sorting
+    "B",      # bugbear
+    "UP",     # modern Python syntax
+    "SIM",    # simplify code
+    "ANN",    # type annotations
+    "D",      # docstrings
+    "RET",    # return statement consistency
+    "RUF",    # Ruff-specific rules
+]
+ignore = [
+    "D203",   # one-blank-line-before-class: conflicts with D211
+    "D213",   # multi-line-summary-second-line: conflicts with D212
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN", "D"]  # tests favor descriptive names over annotations/docstrings
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
