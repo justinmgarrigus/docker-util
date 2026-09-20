@@ -18,6 +18,24 @@ def test_image_name_defaults_to_the_current_user(monkeypatch) -> None:
     assert naming.image_name(directory) == "someone-widget"
 
 
+def test_image_name_sanitizes_an_email_style_username() -> None:
+    directory = Path("/home/jmg22237/projects/docker-util")
+    assert (
+        naming.image_name(directory, user="jmg22237@austin.utexas.edu")
+        == "jmg22237-austin.utexas.edu-docker-util"
+    )
+
+
+def test_image_name_sanitizes_an_unusual_directory_name() -> None:
+    directory = Path("/home/sophie/projects/My Cool App!!")
+    assert naming.image_name(directory, user="sophie") == "sophie-my-cool-app"
+
+
+def test_sanitize_falls_back_when_nothing_valid_remains() -> None:
+    directory = Path("/home/sophie/projects/@@@")
+    assert naming.image_name(directory, user="@@@") == "user-project"
+
+
 def test_container_name_appends_to_the_image_name() -> None:
     assert (
         naming.container_name("sophie-docker-util", "dev")
