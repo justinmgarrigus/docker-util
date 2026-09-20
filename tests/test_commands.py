@@ -273,6 +273,7 @@ def test_init_creates_the_container_and_keeps_going_after_optional_failures(
 
     monkeypatch.setattr(commands.dockercli, "exec_container", _boom)
     monkeypatch.setattr(commands.dockercli, "copy_into", _boom)
+    monkeypatch.setattr(commands.githost, "config_value", lambda _: None)
 
     # No real ~/.ssh, ~/.vimrc, gh token, etc. on the test host -- every
     # optional step should fail, be reported, and not raise.
@@ -283,11 +284,106 @@ def test_init_creates_the_container_and_keeps_going_after_optional_failures(
     assert args[0] == "sophie-my-app-dev"
     assert args[1] == "sophie-my-app"
     assert kwargs["env"]["DOCKER_CONTAINER_NAME"] == "sophie-my-app-dev"
+    assert kwargs["env"]["DOCKER_PATH"] == "/app/my-app"
     assert kwargs["gpus"] == "all"
 
     out = capsys.readouterr()
     assert "warning:" in out.err
     assert (tmp_path / "mnt" / "figures").is_dir()
+
+
+def test_init_derives_the_app_dir_from_the_directory_name(
+    monkeypatch, tmp_path: Path, project_dir: Path
+) -> None:
+    monkeypatch.setattr(commands.naming.getpass, "getuser", lambda: "sophie")
+    monkeypatch.setattr(commands.dockercli, "image_exists", lambda _: True)
+    monkeypatch.setattr(commands.dockercli, "container_exists", lambda _: False)
+    monkeypatch.setattr(commands.config, "MOUNT_DIR", tmp_path / "mnt")
+    monkeypatch.setattr(commands.acl, "mnt_acl", MagicMock())
+    monkeypatch.setattr(commands.dockercli, "exec_container", MagicMock())
+    monkeypatch.setattr(commands.dockercli, "copy_into", MagicMock())
+    monkeypatch.setattr(commands.githost, "config_value", lambda _: None)
+    run_container = MagicMock()
+    monkeypatch.setattr(commands.dockercli, "run_container", run_container)
+
+    commands.cmd_init("dev", directory=project_dir)
+
+    assert run_container.call_args.kwargs["env"]["DOCKER_PATH"] == "/app/my-app"
+
+
+def test_init_respects_app_dir_and_workdir_overrides(
+    monkeypatch, tmp_path: Path, project_dir: Path
+) -> None:
+    monkeypatch.setattr(commands.naming.getpass, "getuser", lambda: "sophie")
+    monkeypatch.setattr(commands.dockercli, "image_exists", lambda _: True)
+    monkeypatch.setattr(commands.dockercli, "container_exists", lambda _: False)
+    monkeypatch.setattr(commands.config, "MOUNT_DIR", tmp_path / "mnt")
+    monkeypatch.setattr(commands.config, "APP_DIR", "/app/llm-serving")
+    monkeypatch.setattr(commands.config, "WORKDIR", "/app/llm-serving/research")
+    monkeypatch.setattr(commands.acl, "mnt_acl", MagicMock())
+    monkeypatch.setattr(commands.dockercli, "exec_container", MagicMock())
+    monkeypatch.setattr(commands.dockercli, "copy_into", MagicMock())
+    monkeypatch.setattr(commands.githost, "config_value", lambda _: None)
+    run_container = MagicMock()
+    monkeypatch.setattr(commands.dockercli, "run_container", run_container)
+
+    commands.cmd_init("dev", directory=project_dir)
+
+    assert (
+        run_container.call_args.kwargs["env"]["DOCKER_PATH"]
+        == "/app/llm-serving/research"
+    )
+
+
+def test_init_uses_the_hosts_own_git_config_when_unset(
+    monkeypatch, tmp_path: Path, project_dir: Path
+) -> None:
+    monkeypatch.setattr(commands.naming.getpass, "getuser", lambda: "sophie")
+    monkeypatch.setattr(commands.dockercli, "image_exists", lambda _: True)
+    monkeypatch.setattr(commands.dockercli, "container_exists", lambda _: False)
+    monkeypatch.setattr(commands.config, "MOUNT_DIR", tmp_path / "mnt")
+    monkeypatch.setattr(commands.acl, "mnt_acl", MagicMock())
+    monkeypatch.setattr(commands.dockercli, "copy_into", MagicMock())
+    monkeypatch.setattr(commands.dockercli, "run_container", MagicMock())
+    monkeypatch.setattr(
+        commands.githost,
+        "config_value",
+        lambda key: {"user.email": "a@b.com", "user.name": "A B"}.get(key),
+    )
+    exec_container = MagicMock()
+    monkeypatch.setattr(commands.dockercli, "exec_container", exec_container)
+
+    commands.cmd_init("dev", directory=project_dir)
+
+    exec_container.assert_any_call(
+        "sophie-my-app-dev",
+        ["git", "config", "--global", "user.email", "a@b.com"],
+    )
+    exec_container.assert_any_call(
+        "sophie-my-app-dev", ["git", "config", "--global", "user.name", "A B"]
+    )
+
+
+def test_init_skips_git_identity_when_nothing_is_configured(
+    monkeypatch, tmp_path: Path, project_dir: Path
+) -> None:
+    monkeypatch.setattr(commands.naming.getpass, "getuser", lambda: "sophie")
+    monkeypatch.setattr(commands.dockercli, "image_exists", lambda _: True)
+    monkeypatch.setattr(commands.dockercli, "container_exists", lambda _: False)
+    monkeypatch.setattr(commands.config, "MOUNT_DIR", tmp_path / "mnt")
+    monkeypatch.setattr(commands.acl, "mnt_acl", MagicMock())
+    monkeypatch.setattr(commands.dockercli, "copy_into", MagicMock())
+    monkeypatch.setattr(commands.dockercli, "run_container", MagicMock())
+    monkeypatch.setattr(commands.githost, "config_value", lambda _: None)
+    exec_container = MagicMock()
+    monkeypatch.setattr(commands.dockercli, "exec_container", exec_container)
+
+    commands.cmd_init("dev", directory=project_dir)
+
+    assert not any(
+        call.args[1][:2] == ["git", "config"]
+        for call in exec_container.call_args_list
+    )
 
 
 def test_claude_settings_patch_script_is_valid_python() -> None:

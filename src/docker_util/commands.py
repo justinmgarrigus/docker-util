@@ -10,7 +10,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from . import acl, config, dockercli, naming
+from . import acl, config, dockercli, githost, naming
 from .errors import DockerUtilError
 
 
@@ -203,10 +203,13 @@ def cmd_init(name: str, *, directory: Path | None = None) -> None:
     acl.mnt_acl(mount_dir)
     acl.mnt_acl(figures_dir)
 
+    app_dir = config.APP_DIR or naming.container_app_dir(directory)
+    work_dir = config.WORKDIR or app_dir
+
     env = {var: os.environ.get(var, "") for var in config.FORWARDED_ENV_VARS}
     env["TZ"] = config.TIMEZONE
     env["DOCKER_CONTAINER_NAME"] = container
-    env["DOCKER_PATH"] = config.CONTAINER_WORKDIR
+    env["DOCKER_PATH"] = work_dir
     env["FIGURES"] = "/mnt/figures"
 
     print("Creating the container ... ", end="", flush=True)
@@ -227,31 +230,22 @@ def cmd_init(name: str, *, directory: Path | None = None) -> None:
 
     print("Configuring the container ... ", end="", flush=True)
 
-    _best_effort(
-        "setting git identity",
-        lambda: (
+    git_email = config.GIT_USER_EMAIL or githost.config_value("user.email")
+    git_name = config.GIT_USER_NAME or githost.config_value("user.name")
+
+    def _set_git_identity() -> None:
+        if git_email:
             dockercli.exec_container(
                 container,
-                [
-                    "git",
-                    "config",
-                    "--global",
-                    "user.email",
-                    config.GIT_USER_EMAIL,
-                ],
-            ),
+                ["git", "config", "--global", "user.email", git_email],
+            )
+        if git_name:
             dockercli.exec_container(
-                container,
-                [
-                    "git",
-                    "config",
-                    "--global",
-                    "user.name",
-                    config.GIT_USER_NAME,
-                ],
-            ),
-        ),
-    )
+                container, ["git", "config", "--global", "user.name", git_name]
+            )
+
+    if git_email or git_name:
+        _best_effort("setting git identity", _set_git_identity)
     _best_effort(
         "copying .vimrc",
         lambda: dockercli.copy_into(
@@ -296,11 +290,7 @@ def cmd_init(name: str, *, directory: Path | None = None) -> None:
         "configuring Claude Code",
         lambda: dockercli.exec_container(
             container,
-            [
-                "python3",
-                "-c",
-                _claude_settings_patch_script(config.CONTAINER_APP_DIR),
-            ],
+            ["python3", "-c", _claude_settings_patch_script(app_dir)],
         ),
     )
     _best_effort(

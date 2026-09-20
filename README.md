@@ -4,18 +4,24 @@ A small per-directory Docker workflow: `build` tags an image after the
 current directory, `init`/`run` create and re-enter containers built from
 it, and `fix`/`list`/`remove` manage what gets left behind.
 
-This is a Python rewrite of an older bash script (`docker-util`). It has the
-same commands and naming conventions, so anything scripted against the old
-tool keeps working, but the implementation is now a tested Python package
-instead of ~650 lines of bash.
+It works with any project that builds a Docker image from a `Dockerfile` in
+its root — nothing about it is tied to one particular project. It ships
+with sensible, generic defaults and everything project- or host-specific is
+read from the environment, so the same installed `docker-util` command
+works across every project on a machine.
+
+This is a Python rewrite of an older bash script of the same name. It has
+the same commands and naming conventions, so anything scripted against the
+old tool keeps working, but the implementation is now a tested Python
+package instead of ~650 lines of bash.
 
 ## Install
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```
-git clone <this repo> ~/desktop/programs/projects/docker-util
-cd ~/desktop/programs/projects/docker-util
+git clone <this repo> ~/projects/docker-util
+cd ~/projects/docker-util
 uv tool install .
 ```
 
@@ -24,7 +30,7 @@ uv tool install .
 source, run `uv tool install --reinstall .` again.
 
 If you'd rather not install it globally, `uv run docker-util <command>` runs
-it from inside the project directory without touching your `PATH`.
+it from inside this project's directory without touching your `PATH`.
 
 ## Concepts
 
@@ -38,7 +44,8 @@ So running `docker-util build` in `~/projects/my-app` as user `sophie`
 builds an image called `sophie-my-app`, and `docker-util init dev` creates a
 container called `sophie-my-app-dev` from it. This is why every command
 (except `init`/`run`, which take a container name) is run from inside the
-project directory with no arguments.
+project directory with no arguments — the directory *is* the project
+identifier.
 
 ## Commands
 
@@ -52,7 +59,7 @@ authoritative, up-to-date usage of each command.
   ACL-writable mount at `/mnt`, forwards a handful of environment variables,
   configures git, timezone, and SSH inside the container, installs Claude
   Code, and authorizes the GitHub CLI. See [Configuring `init`](#configuring-init)
-  below — most of this is specific to one workflow and meant to be edited.
+  below for how to adapt this to a given project or host.
 - **`run <name>`** — Starts an existing container and attaches an
   interactive shell to it.
 - **`fix [name]`** — Repairs ownership of a mount directory that a
@@ -74,25 +81,45 @@ authoritative, up-to-date usage of each command.
   container's `TZ` environment variable, instead of reading the *host*
   shell's `$TZ` (which was usually unset, silently leaving `/etc/localtime`
   a broken symlink).
+- The in-container project path (used to trust the project in Claude Code
+  and as `$DOCKER_PATH`) is now derived from the directory name instead of
+  hardcoded to one project — see below.
+- git identity, if not set explicitly, now falls back to the host's own
+  `git config --global user.{email,name}` instead of a hardcoded default.
 - Every optional setup step in `init` (git identity, vimrc, SSH keys, Claude
   Code, GitHub auth, ...) now reports a `warning: ... continuing.` line if
   it fails, instead of failing silently.
 
 ## Configuring `init`
 
-`init` sets up a container for one specific workflow (Justin's), and that
-setup is concentrated in [`src/docker_util/config.py`](src/docker_util/config.py)
-so it's easy to adapt without reading through the command logic. Most
-values can also be overridden with an environment variable at run time:
+`init` does a lot beyond just starting a container — configuring git, the
+timezone, SSH, Claude Code, and GitHub auth inside it — and that setup is
+concentrated in [`src/docker_util/config.py`](src/docker_util/config.py) so
+it's easy to see and adapt in one place. Every setting there has a generic
+default and can be overridden per-project or per-host with an environment
+variable, without editing the source:
 
 | Setting | Env var | Default |
 | --- | --- | --- |
 | Shared mount directory | `DOCKER_UTIL_MOUNT_DIR` | `~/mnt` |
-| Container timezone | `DOCKER_UTIL_TZ` | `America/Chicago` |
-| Container app directory | `DOCKER_UTIL_APP_DIR` | `/app/llm-serving` |
-| Container working directory | `DOCKER_UTIL_WORKDIR` | `<app dir>/research` |
-| git `user.email` in new containers | `DOCKER_UTIL_GIT_EMAIL` | `justin.m.garrigus@gmail.com` |
-| git `user.name` in new containers | `DOCKER_UTIL_GIT_NAME` | `justinmgarrigus` |
+| Container timezone | `DOCKER_UTIL_TZ` | `UTC` |
+| In-container project directory | `DOCKER_UTIL_APP_DIR` | `/app/<directory name>` |
+| In-container working directory | `DOCKER_UTIL_WORKDIR` | same as the project directory |
+| git `user.email` in new containers | `DOCKER_UTIL_GIT_EMAIL` | the host's own `git config user.email` |
+| git `user.name` in new containers | `DOCKER_UTIL_GIT_NAME` | the host's own `git config user.name` |
+
+The project directory default matches the common `WORKDIR /app/<name>` +
+`COPY . .` convention — for example, an `llm-serving` project whose
+`Dockerfile` does exactly that, then spends most of its time in a
+`research` subdirectory of it. Running `init` from inside that project
+therefore needs one override:
+
+```
+export DOCKER_UTIL_WORKDIR=/app/llm-serving/research
+docker-util init dev
+```
+
+A project that just works from its own root needs no configuration at all.
 
 `init` also forwards a fixed list of host environment variables into every
 new container if they're set (notification/Telegram/Hugging
@@ -113,5 +140,6 @@ uv run ruff check .  # lint
 uv run ruff format . # format
 ```
 
-Tests mock every `docker`/`setfacl` call, so `uv run pytest` never touches a
-real Docker daemon or your filesystem outside of `tmp_path`.
+Tests mock every `docker`/`setfacl`/`git` call, so `uv run pytest` never
+touches a real Docker daemon, a real git config, or your filesystem outside
+of `tmp_path`.

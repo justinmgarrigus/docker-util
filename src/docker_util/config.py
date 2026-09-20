@@ -1,11 +1,10 @@
-"""Defaults for `docker-util init`.
+"""Defaults for `docker-util init`, all overridable by environment variable.
 
-Everything here is specific to Justin's workflow rather than to Docker in
-general, so it's collected in one place: edit this file (or the matching
-environment variable) rather than hunting through `commands.py` when moving
-to a new machine or project.
-
-Nothing here affects `build`, `run`, `fix`, `list`, or `remove`.
+Nothing here is specific to one user or one project: identity comes from
+the environment (falling back to the host's own `git config`), and the
+in-container project path is derived from the directory `init` is run in
+unless overridden. Nothing here affects `build`, `run`, `fix`, `list`, or
+`remove`.
 """
 
 from __future__ import annotations
@@ -19,13 +18,16 @@ MOUNT_DIR = Path(
 )
 
 # Timezone configured inside every new container.
-TIMEZONE = os.environ.get("DOCKER_UTIL_TZ", "America/Chicago")
+TIMEZONE = os.environ.get("DOCKER_UTIL_TZ", "UTC")
 
-# Working directory set inside every new container (its "app" checkout).
-CONTAINER_APP_DIR = os.environ.get("DOCKER_UTIL_APP_DIR", "/app/llm-serving")
-CONTAINER_WORKDIR = os.environ.get(
-    "DOCKER_UTIL_WORKDIR", f"{CONTAINER_APP_DIR}/research"
-)
+# In-container project directory and working directory. Leaving these unset
+# means "derive from the directory `init` is run in" (see
+# naming.container_app_dir) and "same as the app directory", respectively.
+# Set them when a project's Dockerfile uses a different convention -- e.g.
+# llm-serving's Dockerfile does most of its work from a `research`
+# subdirectory of its app directory.
+APP_DIR = os.environ.get("DOCKER_UTIL_APP_DIR")
+WORKDIR = os.environ.get("DOCKER_UTIL_WORKDIR")
 
 # Host environment variables forwarded into every new container, when set.
 FORWARDED_ENV_VARS = (
@@ -39,10 +41,11 @@ FORWARDED_ENV_VARS = (
     "NOTIFY_NTFY_TOPIC",
 )
 
-GIT_USER_EMAIL = os.environ.get(
-    "DOCKER_UTIL_GIT_EMAIL", "justin.m.garrigus@gmail.com"
-)
-GIT_USER_NAME = os.environ.get("DOCKER_UTIL_GIT_NAME", "justinmgarrigus")
+# git identity configured inside every new container. Leaving these unset
+# means "use the host's own `git config --global`", so this works with no
+# configuration at all on a machine that already has git set up.
+GIT_USER_EMAIL = os.environ.get("DOCKER_UTIL_GIT_EMAIL")
+GIT_USER_NAME = os.environ.get("DOCKER_UTIL_GIT_NAME")
 
 VIMRC_PATH = Path.home() / ".vimrc"
 SSH_DIR = Path.home() / ".ssh"

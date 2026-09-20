@@ -23,3 +23,12 @@ def test_container_name_appends_to_the_image_name() -> None:
         naming.container_name("sophie-docker-util", "dev")
         == "sophie-docker-util-dev"
     )
+
+
+def test_container_app_dir_preserves_case_unlike_the_image_name() -> None:
+    assert naming.container_app_dir(
+        Path("/home/sophie/projects/llm-serving")
+    ) == ("/app/llm-serving")
+    assert naming.container_app_dir(Path("/home/sophie/projects/MyApp")) == (
+        "/app/MyApp"
+    )

@@ -26,3 +26,13 @@ def image_name(directory: Path, user: str | None = None) -> str:
 def container_name(image: str, name: str) -> str:
     """Returns the container name for `name` under `image`."""
     return f"{image}-{name}"
+
+
+def container_app_dir(directory: Path) -> str:
+    """Returns the in-container path a Dockerfile is expected to use.
+
+    This is `/app/<directory name>`, case-preserved (unlike the image name,
+    which is lowercased) so it matches what a Dockerfile's `WORKDIR`/
+    `COPY . .` actually wrote.
+    """
+    return f"/app/{directory.name}"
