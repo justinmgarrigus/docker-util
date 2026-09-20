@@ -189,17 +189,23 @@ def cmd_init(name: str, *, directory: Path | None = None) -> None:
     # cleared here: it holds every other container's output too.
     mount_dir = config.MOUNT_DIR
     figures_dir = mount_dir / "figures"
+    research_dir = mount_dir / "research"
     with contextlib.suppress(PermissionError):
         figures_dir.mkdir(parents=True, exist_ok=True)
+        research_dir.mkdir(parents=True, exist_ok=True)
 
     # A container created before the mount was shared can have left this
     # root-owned. Reclaim it now rather than failing confusingly later.
-    if not os.access(figures_dir, os.W_OK):
+    if not os.access(figures_dir, os.W_OK) or not os.access(
+        research_dir, os.W_OK
+    ):
         acl.mnt_reclaim(mount_dir, image)
         figures_dir.mkdir(parents=True, exist_ok=True)
+        research_dir.mkdir(parents=True, exist_ok=True)
 
     acl.mnt_acl(mount_dir)
     acl.mnt_acl(figures_dir)
+    acl.mnt_acl(research_dir)
 
     app_dir = config.APP_DIR or naming.container_app_dir(directory)
     work_dir = config.WORKDIR or app_dir
@@ -209,6 +215,7 @@ def cmd_init(name: str, *, directory: Path | None = None) -> None:
     env["DOCKER_CONTAINER_NAME"] = container
     env["DOCKER_PATH"] = work_dir
     env["FIGURES"] = "/mnt/figures"
+    env["RESEARCH_PATH"] = "/mnt/research"
 
     print("Creating the container ... ", end="", flush=True)
     dockercli.run_container(

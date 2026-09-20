@@ -285,11 +285,14 @@ def test_init_creates_the_container_and_keeps_going_after_optional_failures(
     assert args[1] == "sophie-my-app"
     assert kwargs["env"]["DOCKER_CONTAINER_NAME"] == "sophie-my-app-dev"
     assert kwargs["env"]["DOCKER_PATH"] == "/app/my-app"
+    assert kwargs["env"]["FIGURES"] == "/mnt/figures"
+    assert kwargs["env"]["RESEARCH_PATH"] == "/mnt/research"
     assert kwargs["gpus"] == "all"
 
     out = capsys.readouterr()
     assert "warning:" in out.err
     assert (tmp_path / "mnt" / "figures").is_dir()
+    assert (tmp_path / "mnt" / "research").is_dir()
 
 
 def test_init_derives_the_app_dir_from_the_directory_name(

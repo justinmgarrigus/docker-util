@@ -56,10 +56,13 @@ authoritative, up-to-date usage of each command.
   its `Dockerfile`. `--no-cache` builds from scratch.
 - **`init <name>`** — Creates a new container named `<name>` from the
   current directory's image, and configures it: sets up a shared,
-  ACL-writable mount at `/mnt`, forwards a handful of environment variables,
-  configures git, timezone, and SSH inside the container, installs Claude
-  Code, and authorizes the GitHub CLI. See [Configuring `init`](#configuring-init)
-  below for how to adapt this to a given project or host.
+  ACL-writable mount at `/mnt` (with `$FIGURES` at `/mnt/figures` and
+  `$RESEARCH_PATH` at `/mnt/research`, so every container reads and writes
+  the same figures and research artifacts), forwards a handful of
+  environment variables, configures git, timezone, and SSH inside the
+  container, installs Claude Code, and authorizes the GitHub CLI. See
+  [Configuring `init`](#configuring-init) below for how to adapt this to a
+  given project or host.
 - **`run <name>`** — Starts an existing container and attaches an
   interactive shell to it.
 - **`fix [name]`** — Repairs ownership of a mount directory that a
