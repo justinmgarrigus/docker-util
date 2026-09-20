@@ -136,18 +136,16 @@ def _claude_settings_patch_script(app_dir: str) -> str:
         return [{"hooks": [{"type": "command", "command": command}]}]
 
     hooks = {event: _hook(event) for event in hook_events}
-    onboarding_patch = json.dumps(
-        {
-            "hasCompletedOnboarding": True,
-            "projects": {app_dir: {"hasTrustDialogAccepted": True}},
-        }
-    )
+    onboarding_patch = {
+        "hasCompletedOnboarding": True,
+        "projects": {app_dir: {"hasTrustDialogAccepted": True}},
+    }
     settings = json.dumps({"hooks": hooks})
     return (
         "import json\n"
         "with open('/root/.claude.json') as f:\n"
         "    data = json.load(f)\n"
-        f"data.update({onboarding_patch})\n"
+        f"data.update({onboarding_patch!r})\n"
         "with open('/root/.claude.json', 'w') as f:\n"
         "    json.dump(data, f)\n"
         "with open('/root/.claude/settings.json', 'w') as f:\n"
