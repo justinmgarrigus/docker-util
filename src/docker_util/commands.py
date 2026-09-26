@@ -189,7 +189,10 @@ def cmd_init(name: str, *, directory: Path | None = None) -> None:
     # cleared here: it holds every other container's output too.
     mount_dir = config.MOUNT_DIR
     figures_dir = mount_dir / "figures"
-    research_dir = mount_dir / "research"
+    # Each repository gets its own subdirectory of the shared research base,
+    # so different projects' containers don't write over each other.
+    research_base_dir = mount_dir / "research"
+    research_dir = research_base_dir / directory.name
     with contextlib.suppress(PermissionError):
         figures_dir.mkdir(parents=True, exist_ok=True)
         research_dir.mkdir(parents=True, exist_ok=True)
@@ -205,6 +208,7 @@ def cmd_init(name: str, *, directory: Path | None = None) -> None:
 
     acl.mnt_acl(mount_dir)
     acl.mnt_acl(figures_dir)
+    acl.mnt_acl(research_base_dir)
     acl.mnt_acl(research_dir)
 
     app_dir = config.APP_DIR or naming.container_app_dir(directory)
@@ -215,7 +219,7 @@ def cmd_init(name: str, *, directory: Path | None = None) -> None:
     env["DOCKER_CONTAINER_NAME"] = container
     env["DOCKER_PATH"] = work_dir
     env["FIGURES"] = "/mnt/figures"
-    env["RESEARCH_PATH"] = "/mnt/research"
+    env["RESEARCH_PATH"] = f"/mnt/research/{directory.name}"
 
     print("Creating the container ... ", end="", flush=True)
     dockercli.run_container(

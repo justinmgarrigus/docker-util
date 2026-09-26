@@ -57,8 +57,9 @@ authoritative, up-to-date usage of each command.
 - **`init <name>`** — Creates a new container named `<name>` from the
   current directory's image, and configures it: sets up a shared,
   ACL-writable mount at `/mnt` (with `$FIGURES` at `/mnt/figures` and
-  `$RESEARCH_PATH` at `/mnt/research`, so every container reads and writes
-  the same figures and research artifacts), forwards a handful of
+  `$RESEARCH_PATH` at `/mnt/research/<repository name>`, so every container
+  reads and writes the same figures, and every container of a repository
+  shares that repository's research artifacts), forwards a handful of
   environment variables, configures git, timezone, and SSH inside the
   container, installs Claude Code, and authorizes the GitHub CLI. See
   [Configuring `init`](#configuring-init) below for how to adapt this to a
